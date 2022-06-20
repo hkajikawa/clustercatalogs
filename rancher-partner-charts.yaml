@@ -1,0 +1,7 @@
+apiVersion: catalog.cattle.io/v1
+kind: ClusterRepo
+metadata:
+  name: rancher-partner-charts
+spec:
+  gitBranch: main
+  gitRepo: https://git.rancher.io/partner-charts
