@@ -1,4 +1,4 @@
-defaultNamespace: idcf-system
+defaultNamespace: test-hkajikawa
 
 targetCustomizations:
 - name: all-customers
