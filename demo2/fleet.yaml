@@ -1,0 +1,7 @@
+defaultNamespace: default
+
+targetCustomizations:
+- name: all-customers
+  clusterGroup: all-customers
+  kustomize:
+    dir: .
