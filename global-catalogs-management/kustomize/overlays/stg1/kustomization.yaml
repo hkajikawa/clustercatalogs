@@ -8,4 +8,4 @@ patches:
 - target:
     kind: Deployment
     name: global-catalogs-management
-  path: Deployment_patch.json
+#  path: Deployment_patch.json
