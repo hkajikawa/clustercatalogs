@@ -1,0 +1,229 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: global-catalogs-scripts
+  namespace: idcf-system
+data:
+  catalogs_function.sh: |-
+    # ロギングとコマンド実行
+    function _log () {
+      local message=$1
+      now=$( date +%FT%T%z )
+      echo $now $message
+    }
+
+    # $1のclusterreposにが存在しているか確認
+    function _exist_repo () {
+      local clusterrepo=$1
+      kubectl get clusterrepos.catalog.cattle.io $clusterrepo --no-headers -o name
+    }
+
+    # $1のclusterreposを削除する
+    function _delete_clusterrepo () {
+      local clusterrepo=$1
+      kubectl delete clusterrepos.catalog.cattle.io $clusterrepo
+    }
+
+    # $1のclusterreposを追加する
+    function _create_clusterrepo () {
+      local clusterrepo=$1
+      local url=$2
+
+      echo "
+    apiVersion: catalog.cattle.io/v1
+    kind: ClusterRepo
+    metadata:
+      name: $clusterrepo
+    spec:
+      url: $url
+      " | kubectl create -f -
+    }
+
+    # $1のclusterreposに.spec.gitBranchを返す
+    function _get_gitBranch () {
+      local clusterrepo=$1
+      kubectl get clusterrepos.catalog.cattle.io $clusterrepo -o jsonpath='{.spec.gitBranch}'
+    }
+
+    # $1のclusterreposに.spec.gitRepoを返す
+    function _get_gitRepo () {
+      local clusterrepo=$1
+      kubectl get clusterrepos.catalog.cattle.io $clusterrepo -o jsonpath='{.spec.gitRepo}'
+    }
+
+    # $1のclusterreposに.spec.urlを返す
+    function _get_url () {
+      local clusterrepo=$1
+      kubectl get clusterrepos.catalog.cattle.io $clusterrepo -o jsonpath='{.spec.url}'
+    }
+
+    ## $1のclusterreposに.spec.gitBranchを削除する
+    #function _delete_gitBranch () {
+    #  local clusterrepo=$1
+    #  kubectl patch clusterrepos.catalog.cattle.io $clusterrepo --type json --patch '[{"op": "remove", "path": "/spec/gitBranch"}]'
+    #}
+
+    ## $1のclusterreposに.spec.gitRepoを削除する
+    #function _delete_gitRepo () {
+    #  local clusterrepo=$1
+    #  kubectl patch clusterrepos.catalog.cattle.io $clusterrepo --type json --patch '[{"op": "remove", "path": "/spec/gitRepo"}]'
+    #}
+
+    ## $1のclusterreposに.spec.urlを追加する
+    #function _add_url () {
+    #  local clusterrepo=$1
+    #  local url=$2
+    #  kubectl patch clusterrepos.catalog.cattle.io $clusterrepo --type json --patch "[{\"op\": \"add\", \"path\": \"/spec\", \"value\": {\"url\": \"$url\"}}]"
+    #}
+
+    ## $1のclusterreposの.spec.urlを修正する
+    #function _replace_url () {
+    #  local clusterrepo=$1
+    #  local url=$2
+    #  kubectl patch clusterrepos.catalog.cattle.io $clusterrepo --type json --patch "[{\"op\": \"replace\", \"path\": \"/spec/url\", \"value\": \"$url\"}]"
+    #}
+  create_catalogs.sh: |-
+    #!/bin/bash
+
+    # 共通関数のロード
+    . $SCRIPT_DIR/catalogs_function.sh
+
+    create_list=$( curl -s $CREATE_LIST_URL )
+    if [ "$?" != "0" ]; then
+      exit 1
+    fi
+
+    echo "$create_list" | while read line; do
+      create_name=$( echo $line | jq -r .name )
+      create_url=$( echo $line | jq -r .url )
+
+      _exist_repo $create_name > /dev/null 2>&1
+      if [ "$?" == "0" ]; then
+        exit 1
+      fi
+
+      _log "CREATE: $create_name, $create_url"
+      _create_clusterrepo $create_name $create_url
+    done
+  delele_catalogs.sh: |-
+    #!/bin/bash
+
+    # 共通関数のロード
+    . $SCRIPT_DIR/catalogs_function.sh
+
+    delete_list=$( curl -s $DELETE_LIST_URL )
+    if [ "$?" != "0" ]; then
+      exit 1
+    fi
+
+    echo "$delete_list" | while read line; do
+      delete_name=$( echo $line | jq -r .name )
+
+      _exist_repo $delete_name > /dev/null 2>&1
+      if [ "$?" == "1" ]; then
+        exit 1
+      fi
+
+      _log "DELETE: $delete_name"
+      _delete_clusterrepo $delete_name
+    done
+  global_catalogs.sh: |-
+    #!/bin/bash
+
+    # ファイル(/watch/global_catalogs)をwatchし、ファイルが更新されると削除処理を実行する
+    while true; do
+      while inotifywait -e MODIFY /watch/clusterrepos; do
+        # 削除対象のRepositoryを削除
+        . $SCRIPT_DIR/delele_catalogs.sh
+        sleep 1
+
+        # 追加されているべきRepositoryの修正
+        . $SCRIPT_DIR/replace_catalogs.sh
+        sleep 1
+
+        # 追加されているべきRepositoryを追加
+        . $SCRIPT_DIR/create_catalogs.sh
+        sleep 1
+      done
+    done
+  init_catalogs.sh: |-
+    #!/bin/bash
+
+    . $SCRIPT_DIR/delele_catalogs.sh
+    sleep 1
+
+    . $SCRIPT_DIR/replace_catalogs.sh
+    sleep 1
+
+    . $SCRIPT_DIR/create_catalogs.sh
+    sleep 1
+  replace_catalogs.sh: |-
+    #!/bin/bash
+
+    # 共通関数のロード
+    . $SCRIPT_DIR/catalogs_function.sh
+
+    replace_list=$( curl -s $CREATE_LIST_URL )
+    if [ "$?" != "0" ]; then
+      exit 1
+    fi
+
+    echo "$replace_list" | while read line; do
+      replace_name=$( echo $line | jq -r .name )
+      replace_url=$( echo $line | jq -r .url )
+
+      _exist_repo $replace_name > /dev/null 2>&1
+      if [ "$?" == "1" ]; then
+        exit 1
+      fi
+
+      replace="0"
+
+      # urlがなければREPLACEとマーク
+      url=$( _get_url $replace_name )
+      if [ "$url" == "" ]; then
+        replace="1"
+      fi
+
+      # urlの内容が正しくなければREPLACEとマーク
+      url=$( _get_url $replace_name )
+      if [ "$url" != "$replace_url" ]; then
+        replace="1"
+      fi
+
+      # gitBranchがあったらREPLACEとマーク
+      gitbranch=$( _get_gitBranch $replace_name )
+      if [ "$gitbranch" != "" ]; then
+        replace="1"
+      fi
+
+      # gitRepoがあったらREPLACEとマーク
+      gitrepo=$( _get_gitRepo $replace_name )
+      if [ "$gitrepo" != "" ]; then
+        replace="1"
+      fi
+
+      # REPLACEとマークがあった時は、削除して再作成する。
+      if [ "$replace" == "1" ]; then
+        _log "DELETE: $replace_name"
+        _delete_clusterrepo $replace_name $replace_url
+        _log "CREATE: $replace_name"
+        _create_clusterrepo $replace_name $replace_url
+      fi
+    done
+  watch_catalogs.sh: |-
+    #!/bin/bash
+
+    # ロギングとコマンド実行
+    function _exec_cmd () {
+      now=$( date +%FT%T%z )
+      echo $now $1
+      $1 >> /watch/clusterrepos
+    }
+
+    # ClusterRepoをwatchする
+    while true; do
+      echo > /watch/clusterrepos
+      _exec_cmd "kubectl get clusterrepos.catalog.cattle.io --watch-only=true --output-watch-events=true --no-headers"
+      sleep 1
+    done

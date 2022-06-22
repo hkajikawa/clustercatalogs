@@ -1,0 +1,22 @@
+[
+  {
+    "op": "replace",
+    "path": "/spec/template/spec/initContainers/0/env/1/value",
+    "value": "https://container.idcfcloud.com/global-catalogs/create-list"
+  },
+  {
+    "op": "replace",
+    "path": "/spec/template/spec/initContainers/0/env/2/value",
+    "value": "https://container.idcfcloud.com/global-catalogs/delete-list"
+  },
+  {
+    "op": "replace",
+    "path": "/spec/template/spec/containers/1/env/1/value",
+    "value": "https://container.idcfcloud.com/global-catalogs/create-list"
+  },
+  {
+    "op": "replace",
+    "path": "/spec/template/spec/containers/1/env/2/value",
+    "value": "https://container.idcfcloud.com/global-catalogs/delete-list"
+  }
+]

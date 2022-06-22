@@ -1,0 +1,7 @@
+defaultNamespace: idcf-system
+
+targetCustomizations:
+- name: all-customers
+  clusterGroup: all-customers
+  kustomize:
+    dir: ./kustomize/overlays/stg1
