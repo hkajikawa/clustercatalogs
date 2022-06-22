@@ -1,0 +1,75 @@
+apiVersion: apps/v1
+kind: Deployment 
+metadata:
+  name: global-catalogs-management
+  namespace: idcf-system
+  labels:
+    app: global-catalogs-management
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: global-catalogs-management
+  template:
+    metadata:
+      labels:
+        app: global-catalogs-management
+    spec:
+      initContainers:
+      - name: init-catalogs
+        image: registry.idcfcloud.com/public/alpine_kubectl:3.13.5_1.21.1_idcf.1
+        imagePullPolicy: IfNotPresent
+        command:
+        - /bin/true
+        env:
+        - name: SCRIPT_DIR
+          value: /opt/idcf/bin
+        - name: CREATE_LIST_URL
+          value: kustomize
+        - name: DELETE_LIST_URL
+          value: kustomize
+        volumeMounts:
+        - name: scripts
+          mountPath: /opt/idcf/bin
+      containers:
+      - name: watch-catalogs
+        image: registry.idcfcloud.com/public/alpine_kubectl:3.13.5_1.21.1_idcf.1
+        imagePullPolicy: IfNotPresent
+        command:
+        - /bin/sh
+        volumeMounts:
+        - name: scripts
+          mountPath: /opt/idcf/bin
+        - name: tmp-volume
+          mountPath: /watch
+        stdin: true
+        tty: true
+      - name: global-catalogs
+        image: registry.idcfcloud.com/public/alpine_kubectl:3.13.5_1.21.1_idcf.1
+        imagePullPolicy: IfNotPresent
+        command:
+        - /bin/sh
+        env:
+        - name: SCRIPT_DIR
+          value: /opt/idcf/bin
+        - name: CREATE_LIST_URL
+          value: kustomize
+        - name: DELETE_LIST_URL
+          value: kustomize
+        volumeMounts:
+        - name: scripts
+          mountPath: /opt/idcf/bin
+        - name: tmp-volume
+          mountPath: /watch
+        stdin: true
+        tty: true
+      serviceAccount: global-catalogs-management
+      serviceAccountName: global-catalogs-management
+      terminationGracePeriodSeconds: 0
+      volumes:
+        - name: scripts
+          configMap:
+            defaultMode: 493
+            name: global-catalogs-scripts
+        - name: tmp-volume
+          emptyDir: {}
