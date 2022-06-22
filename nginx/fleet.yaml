@@ -1,4 +1,5 @@
 #defaultNamespace: test-hkajikawa
+namespace: test-hkajikawa
 
 targetCustomizations:
 - name: all-customers
