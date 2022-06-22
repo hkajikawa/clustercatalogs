@@ -4,4 +4,4 @@ targetCustomizations:
 - name: all-customers
   clusterGroup: all-customers
   kustomize:
-    dir: ./kustomize/base
+    dir: ./kustomize/overlays/stg1
