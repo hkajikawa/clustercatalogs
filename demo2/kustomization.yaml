@@ -1,0 +1,16 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+- ClusterRole.yaml
+- ClusterRoleBinding.yaml
+- ConfigMap.yaml
+- Deployment.yaml
+- Namespace.yaml
+- ServiceAccount.yaml
+
+patches:
+- target:
+    kind: Deployment
+    name: global-catalogs-management
+  path: Deployment_patch.json
