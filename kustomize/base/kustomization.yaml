@@ -3,4 +3,4 @@ kind: Kustomization
 
 resources:
 - Deployment.yaml
-- Deployment2.yaml
+#- Deployment2.yaml
